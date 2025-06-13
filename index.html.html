@@ -1,0 +1,268 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Battery Record Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: #fff;
+      font-size: 13px;
+    }
+    header {
+      text-align: center;
+      padding: 20px 10px;
+      font-size: 20px;
+      font-weight: 600;
+      text-shadow: 1px 1px 4px #000;
+      background: rgba(0, 0, 0, 0.3);
+    }
+    .container {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 15px;
+      padding: 20px;
+      margin: 20px auto;
+      width: 95%;
+      max-width: 1400px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 15px;
+    }
+    .filters input, .filters select, .filters button {
+      padding: 10px 14px;
+      font-size: 13px;
+      border: none;
+      border-radius: 10px;
+      background: #fff;
+      color: #333;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+      transition: all 0.3s ease;
+    }
+    .filters button {
+      background-color: #ff5722;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .filters button:hover {
+      background-color: #e64a19;
+      transform: translateY(-1px);
+    }
+    .actions {
+      text-align: center;
+      margin-bottom: 15px;
+    }
+    .actions button {
+      padding: 10px 20px;
+      font-size: 13px;
+      border: none;
+      border-radius: 10px;
+      margin: 5px;
+      background: #4caf50;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+      transition: 0.3s;
+    }
+    .actions button:hover {
+      background: #388e3c;
+      transform: translateY(-1px);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      color: #333;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+      font-size: 12px;
+    }
+    th, td {
+      padding: 10px 12px;
+      text-align: center;
+      border: 1px solid #ddd;
+      word-break: break-word;
+    }
+    th {
+      background: #ff5722;
+      color: #fff;
+      font-weight: 600;
+      cursor: default;
+    }
+    tr:nth-child(even) {background-color: #f9f9f9;}
+    tr:hover {background-color: #e0f7fa;}
+    th:nth-child(3), td:nth-child(3) { width: 200px; max-width: 200px; }
+    th:nth-child(4), td:nth-child(4) { width: 60px;  max-width: 60px; }
+    th:nth-child(5), td:nth-child(5) { width: 60px;  max-width: 60px; }
+    th:nth-child(6), td:nth-child(6) { width: 80px;  max-width: 80px; }
+    th:nth-child(7), td:nth-child(7) { width: 70px;  max-width: 70px; }
+    th:nth-child(8), td:nth-child(8) { width: 80px;  max-width: 80px; }
+    #loader { text-align: center; padding: 30px; display: none; }
+    .spinner {
+      border: 6px solid rgba(255, 255, 255, 0.1);
+      border-top: 6px solid #ff5722;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @media(max-width: 768px){
+      .filters input, .filters select, .filters button, .actions button { width: 100%; }
+      table { font-size: 11px; }
+    }
+    @media print {
+      @page { size: A4 landscape; margin: 10mm; }
+      body { background: #fff !important; color: #000 !important; }
+      header, .filters, .actions, #loader { display: none !important; }
+      table { box-shadow: none !important; border: 1px solid #333 !important; width: 100%; }
+      th { background: #f0f0f0 !important; color: #000 !important; border: 1px solid #333 !important; }
+      td { border: 1px solid #333 !important; }
+    }
+  </style>
+</head>
+
+<body>
+
+<header>Battery Record Dashboard</header>
+
+<div class="container">
+  <div class="filters">
+    <input type="text" id="regSearch" placeholder="Search Vehicle No...">
+    <button onclick="applyFilters()">Search</button>
+    <button onclick="resetFilters()">Reset</button>
+    <select id="advisorFilter">
+      <option value="">All Advisors</option>
+    </select>
+  </div>
+
+  <div class="actions">
+    <button onclick="exportToExcel()">Export to Excel</button>
+    <button onclick="window.print()">Print</button>
+    <button onclick="showPendingList()">Pending List</button>
+  </div>
+
+  <div id="loader"><div class="spinner"></div></div>
+
+  <table id="dataTable">
+    <thead>
+      <tr>
+        <th>SL NO</th>
+        <th>CUSTOMER NAME</th>
+        <th>REG NO</th>
+        <th>BATTERY TYPE</th>
+        <th>BATTERY CODE</th>
+        <th>OLD BATTERY RECEIVED DATE</th>
+        <th>NB STATUS</th>
+        <th>NEW BATTERY RECEIVED DATE</th>
+        <th>ADVISOR NAME</th>
+        <th>HANDED OVER TO</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+  const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfhnqML3UjIflybiou-K798FIYsuM760SPG9H8foi-FJC7hWqitnOLah3qvBDe4w/pub?gid=2127997427&single=true&output=csv";
+  let fullData = [], currentData = [];
+
+  async function fetchData() {
+    document.getElementById('loader').style.display = 'block';
+    const response = await fetch(csvUrl);
+    const data = await response.text();
+    const rows = data.split("\n").slice(1).map(row => row.split(",").map(col => col.replace(/"/g, "")));
+    fullData = rows.filter(row => row.length >= 10);
+    currentData = fullData;
+    document.getElementById('loader').style.display = 'none';
+    populateAdvisorDropdown();
+    renderTable(currentData);
+  }
+
+  function renderTable(data) {
+    const tbody = document.querySelector("#dataTable tbody");
+    tbody.innerHTML = "";
+    data.forEach((row, index) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${index + 1}</td>
+        <td>${row[1]}</td>
+        <td>${row[2]}</td>
+        <td>${row[3]}</td>
+        <td>${row[4]}</td>
+        <td>${row[5]}</td>
+        <td>${row[6]}</td>
+        <td>${row[7]}</td>
+        <td>${row[8]}</td>
+        <td>${row[9]}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function populateAdvisorDropdown() {
+    const advisorSet = new Set(fullData.map(row => row[8]));
+    const advisorFilter = document.getElementById("advisorFilter");
+    advisorFilter.innerHTML = '<option value="">All Advisors</option>';
+    advisorSet.forEach(advisor => {
+      if(advisor.trim()) {
+        const option = document.createElement("option");
+        option.value = advisor;
+        option.textContent = advisor;
+        advisorFilter.appendChild(option);
+      }
+    });
+  }
+
+  function applyFilters() {
+    const regValue = document.getElementById("regSearch").value.toLowerCase();
+    const advisorValue = document.getElementById("advisorFilter").value;
+    currentData = fullData.filter(row => 
+      row[2].toLowerCase().includes(regValue) &&
+      (advisorValue === "" || row[8] === advisorValue)
+    );
+    renderTable(currentData);
+  }
+
+  function resetFilters() {
+    document.getElementById("regSearch").value = "";
+    document.getElementById("advisorFilter").value = "";
+    currentData = fullData;
+    renderTable(currentData);
+  }
+
+  function exportToExcel() {
+    const header = ["SL NO", "CUSTOMER NAME", "REG NO", "BATTERY TYPE", "BATTERY CODE", "OLD BATTERY RECEIVED DATE", "NB STATUS", "NEW BATTERY RECEIVED DATE", "ADVISOR NAME", "HANDED OVER TO"];
+    const data = currentData.map((row, index) => [
+      index + 1, row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9]
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    XLSX.writeFile(wb, "BatteryData.xlsx");
+  }
+
+  function showPendingList() {
+    currentData = fullData.filter(row => row[9].trim() === "");
+    renderTable(currentData);
+  }
+
+  fetchData();
+  setInterval(fetchData, 300000);
+</script>
+
+</body>
+</html>
